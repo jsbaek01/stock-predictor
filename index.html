@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI Forward PER 주가 예측 시스템</title>
+<style>
+/* 시스템 공통 모바일 반응형 뷰포트 레이아웃 */
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+background-color: #f4f6f9;
+color: #333333;
+display: flex;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+margin: 0;
+padding: 20px;
+box-sizing: border-box;
+}
+.container {
+background: #ffffff;
+padding: 30px 24px;
+border-radius: 24px;
+box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+width: 100%;
+max-width: 400px;
+box-sizing: border-box;
+}
+h2 {
+color: #0f172a;
+margin-top: 0;
+margin-bottom: 8px;
+font-size: 24px;
+font-weight: 800;
+letter-spacing: -0.5px;
+}
+.subtitle {
+font-size: 13px;
+color: #64748b;
+margin-bottom: 28px;
+font-weight: 500;
+}
+.search-box {
+display: flex;
+gap: 10px;
+margin-bottom: 24px;
+}
+input {
+flex: 1;
+padding: 16px;
+border: 2px solid #e2e8f0;
+border-radius: 16px;
+font-size: 16px;
+font-weight: 600;
+outline: none;
+background: #f8fafc;
+transition: all 0.2s ease;
+-webkit-appearance: none;
+}
+input:focus {
+border-color: #007afc;
+background: #ffffff;
+box-shadow: 0 0 0 4px rgba(0, 122, 252, 0.15);
+}
+button {
+padding: 0 24px;
+background-color: #007afc;
+color: white;
+border: none;
+border-radius: 16px;
+font-size: 16px;
+cursor: pointer;
+font-weight: 700;
+transition: all 0.2s ease;
+}
+button:hover {
+background-color: #0062cc;
+}
+button:active {
+transform: scale(0.98);
+}
+.result-box {
+text-align: left;
+border-top: 1px solid #f1f5f9;
+padding-top: 24px;
+display: none;
+}
+.stock-title {
+font-weight: 800;
+color: #007afc;
+margin-bottom: 18px;
+text-align: center;
+font-size: 22px;
+background: #f0f7ff;
+padding: 12px;
+border-radius: 14px;
+}
+
+/* 다이내믹 시나리오 가이드 정보창 정의 */
+.guide-box {
+padding: 16px;
+border-radius: 14px;
+font-size: 13px;
+line-height: 1.6;
+margin-bottom: 20px;
+font-weight: 500;
+}
+.guide-success {
+background-color: #f0fdf4;
+border: 1px solid #bbf7d0;
+color: #166534;
+}
+.guide-warning {
+background-color: #fff7ed;
+border: 1px solid #ffedd5;
+color: #9a3412;
+}
+
+.row {
+display: flex;
+justify-content: space-between;
+align-items: center;
+border-bottom: 1px solid #f8fafc;
+padding: 14px 4px;
+}
+.row-label {
+font-size: 15px;
+font-weight: 600;
+color: #64748b;
+}
+.highlight {
+font-size: 16px;
+font-weight: 700;
+color: #1e293b;
+}
+.predict {
+font-size: 20px;
+font-weight: 800;
+color: #df2020;
+}
+.info-text {
+font-size: 11px;
+color: #94a3b8;
+text-align: center;
+margin-top: 20px;
+line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h2>📈 주가 예측 시스템</h2>
+<div class="subtitle">12M Rolling Forward EPS Engine</div>
+
+<div class="search-box">
+<input type="text" id="stockInput" placeholder="종목명 입력 (예: 삼성전자)" onkeyup="if(window.event.keyCode==13){searchStock()}">
+<button onclick="searchStock()">검색</button>
+</div>
+
+<div id="resultArea" class="result-box">
+<div id="stockTitle" class="stock-title">-</div>
+<div id="guideMessage" class="guide-box">-</div>
+
+<div class="row">
+<span class="row-label">현재 주가</span>
+<span id="currentPrice" class="highlight">-</span>
+</div>
+<div class="row">
+<span class="row-label">익일 예측 주가</span>
+<span id="predictPrice" class="predict">-</span>
+</div>
+
+<div class="info-text">
+* 本 예측치는 익일 일별 롤링 가중 가이던스 EPS와 선행 PER을 기반으로 연산된 결과입니다.
+</div>
+</div>
+</div>
+
+<!-- 이 자리에 2단계 핵심 자바스크립트가 인입됩니다 -->
+<script>
+// 💡 Render 백엔드가 생성해준 실시간 라이브 주소(https://...onrender.com)를 아래에 정확히 바인딩하세요.
+// 로컬 환경에서 테스트 시 기본 주소인 "http://127.0.0.1:10000"을 그대로 유지하셔도 됩니다.
+const BACKEND_URL = "http://127.0.0.1:10000";
+
+function searchStock() {
+const stockInput = document.getElementById('stockInput');
+const stockName = stockInput.value.trim().replace(/ /g, '');
+const resultArea = document.getElementById('resultArea');
+const guideMessage = document.getElementById('guideMessage');
+
+// 빈값 입력 방어 처리
+if (!stockName) {
+alert('종목명을 입력해 주세요.');
+return;
+}
+
+// 비동기 락(Lock) 기동 - 연산 중 연속 터치 제어
+const btn = document.querySelector('.search-box button');
+btn.disabled = true;
+btn.innerText = '연산중..';
+
+// 렌더 백엔드로 데이터 세그먼트 전송
+fetch(${BACKEND_URL}/search, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stock_name: stockName }) }) .then(res =&gt; { if (!res.ok) throw new Error('서버 통신 에러'); return res.json(); }) .then(data =&gt; { if (data.success) { // 1. 기본 시세 데이터 동적 인젝션 document.getElementById('stockTitle').innerText = ``${data.stock_name} (${data.stock_code})`;
+document.getElementById('currentPrice').innerText = data.current_price;
+document.getElementById('predictPrice').innerText = data.predicted_price;
+
+// 2. 가이드 박스 정상 구문 동적 치환 및 스위칭
+if (data.is_consensus && data.est_count > 0) {
+guideMessage.className = "guide-box guide-success";
+guideMessage.innerHTML = 🎯 &lt;strong&gt;금융투자업계 집단지성 분석 완료&lt;/strong&gt;&lt;br&gt;최근 에프앤가이드(FnGuide) 기준 주요 증권사 &lt;strong&gt;${data.est_count}개소</strong>의 정밀 추정 컨센서스가 고시된 종목입니다. 검증된 기관 가이던스 실적 데이터를 바탕으로 익일 롤링 가중 연산 엔진을 가동하여 산출했습니다.; } else { guideMessage.className = "guide-box guide-warning"; guideMessage.innerHTML =⚙️ <strong>시장 묵시적 퀀트 모델링(Implied Model) 가동</strong><br>본 종목은 최근 제시된 증권사 컨센서스가 존재하지 않는 기업입니다. 실시간 시장 시세에서 추출한 <strong>시장 묵시적 EPS(Implied EPS)</strong>와 업종 평균 멀티플을 역산하여 공백을 정밀 보정하고 익일 롤링 추정치를 도출했습니다.`;
+}
+
+// 결과 영역 오픈
+resultArea.style.display = 'block';
+} else {
+// 상장 폐지 및 미상장 예외 핸들링 팝업
+alert(data.message);
+stockInput.value = '';
+resultArea.style.display = 'none';
+}
+})
+.catch(err => {
+console.error(err);
+alert('서버가 응답하지 않습니다. 백엔드가 정상 구동 중인지 확인해 주세요.');
+})
+.finally(() => {
+// 비동기 락 해제
+btn.disabled = false;
+btn.innerText = '검색';
+});
+}
+</script>
+</body>
+</html>
