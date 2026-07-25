@@ -106,8 +106,9 @@ def get_live_financial_data(stock_code):
             
             # 컨센서스 컬럼 위치 매핑 안전 슬라이싱 (유동적인 칼럼 개수 방어)
             if len(eps_values) >= 5:
-                val_this = eps_values[3].replace(",", "").strip() # 2026년 예상치 배치 슬롯
-                val_next = eps_values[4].replace(",", "").strip() # 2027년 예상치 배치 슬롯
+                val_this = eps_values[-2].replace(",", "").strip() # 올해(2026) 예측 실적 자동 타겟
+                val_next = eps_values[-1].replace(",", "").strip() # 내년(2027) 예측 실적 자동 타겟
+
                 if val_this != '-' and val_next != '-':
                     eps_this = int(val_this)
                     eps_next = int(val_next)
