@@ -85,7 +85,7 @@ def get_live_financial_data(stock_code):
         print(f"Live Price API Network Error: {str(e)}")
 
     # 2. 기업실적분석 재무 가이던스 추출 (finance.naver 서브 도메인 정상화)
-    finance_url = f"https://naver.com{stock_code}"
+    finance_url = f"https://naver.com?code={stock_code}"
     eps_this = None
     eps_next = None
     per_multiple = None
