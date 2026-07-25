@@ -152,30 +152,38 @@ def get_live_financial_data(stock_code):
 # =====================================================================
 @app.route("/search", methods=["POST"])
 def search_stock():
-    """ 프론트엔드의 비동기 통신을 수신하여 최종 예측 리포트를 패키징하는 라우터입니다. """
     req_data = request.get_json()
     if not req_data or "stock_name" not in req_data:
         return jsonify({"success": False, "message": "Invalid Request Protocol"})
         
     stock_name = req_data.get("stock_name", "").strip()
-    code = get_stock_code_by_name(stock_name)
     
-    if not code:
+    # 💡 1단계 디버깅 진단: 네이버 자동완성 API 원시 주소 직격 호출 테스트
+    search_url = f"https://naver.com{stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
+    try:
+        response = requests.get(search_url, timeout=5)
+        search_data = response.json()
+    except Exception as e:
+        return jsonify({"success": False, "message": f"❌ 네이버 접속 자체가 실패함: {str(e)}"})
+        
+    # 💡 [화면 강제 로그 인젝션 1] 네이버가 준 전체 원시 JSON을 프론트엔드 알림창으로 즉시 쏴버립니다.
+    # 만약 이 팝업창에 데이터가 텅 비어있다면 네이버 IP 차단이 확실한 것입니다.
+    if stock_name and ("items" in search_data):
         return jsonify({
-            "success": False,
-            "message": f"'{stock_name}'은(는) 한국거래소(KRX) 상장 사전에 존재하지 않습니다."
+            "success": False, 
+            "message": f"🔍 [네이버 원시 데이터 획득 성공]\n전체 배열 구조: {str(search_data['items'])}"
         })
+
+    # 이하 코드는 혹시 모를 다음 단계를 위해 기존 흐름을 유지합니다.
+    code = get_stock_code_by_name(stock_name)
+    if not code:
+        return jsonify({"success": False, "message": f"'{stock_name}'은(는) 상장 주식 사전에 존재하지 않습니다."})
         
     raw_data = get_live_financial_data(code)
     if raw_data["current_price"] == 0:
         return jsonify({"success": False, "message": "거래소 실시간 시세 패킷 동기화 실패"})
 
-    # 정밀 롤링 연산 엔진 가동
-    predictor = ForwardPricePredictor(
-        eps_this_year=raw_data["eps_this"], 
-        eps_next_year=raw_data["eps_next"]
-    )
-    
+    predictor = ForwardPricePredictor(eps_this_year=raw_data["eps_this"], eps_next_year=raw_data["eps_next"])
     tomorrow_date = datetime.date.today() + datetime.timedelta(days=1)
     predicted_price_val = predictor.predict_price(tomorrow_date, raw_data["per"])
     
@@ -188,6 +196,7 @@ def search_stock():
         "is_consensus": raw_data["is_consensus"],
         "est_count": raw_data["est_count"]
     })
+
 
 # =====================================================================
 # PART 6. INFRA DEPLOYMENT EXECUTER
