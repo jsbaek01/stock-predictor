@@ -160,9 +160,12 @@ def search_stock():
     
     # 💡 1단계 디버깅 진단: 네이버 자동완성 API 원시 주소 직격 호출 테스트
     search_url = f"https://naver.com?q={stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
-
     try:
-        response = requests.get(search_url, timeout=5)
+        # 💡 네이버 보안 필터를 완벽히 우회하는 브라우저 가짜 가면(Headers) 주입
+        debug_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(search_url, headers=debug_headers, timeout=5)
         search_data = response.json()
     except Exception as e:
         return jsonify({"success": False, "message": f"❌ 네이버 접속 자체가 실패함: {str(e)}"})
