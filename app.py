@@ -21,11 +21,13 @@ def get_stock_code_by_name(stock_name):
         response = requests.get(search_url, timeout=5)
         search_data = response.json()
         if "items" in search_data and len(search_data["items"]) > 0:
-            match_list = search_data["items"]
-            for item in match_list:
-                if item.replace(" ", "") == stock_name:
-                    return item  # 6자리 표준 종목 코드 반환
-           
+            # 네이버 통합 금융 검색 데이터 세그먼트의 첫 번째 노드 진입
+            sub_items = search_data["items"][0]
+            for item in sub_items:
+                # item[1]에 한글 종목명, item[2]에 6자리 종목코드가 실시간 매핑되어 들어옵니다.
+                if item[1].replace(" ", "") == stock_name:
+                    return item[2] # 진짜 6자리 코드(예: '005930') 추출 확정
+
         if stock_name == "삼성전자": return "005930"
         if stock_name == "SK하이닉스" or stock_name == "하이닉스": return "000660"
         if stock_name == "현대차": return "005380"
