@@ -15,7 +15,7 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
-    search_url = f"https://naver.com?q={stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
+    search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     try:
         response = requests.get(search_url, timeout=5)
         search_data = response.json()
