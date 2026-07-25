@@ -69,7 +69,7 @@ def get_live_financial_data(stock_code):
     try:
         price_res = requests.get(price_url, headers=headers, timeout=5)
         price_data = price_res.json()
-        if "closePrice" in price_data:
+        if price_data and "closePrice" in price_data:
             current_price = int(price_data["closePrice"].replace(",", ""))
     except Exception as e:
         print(f"Live Price API Network Error: {str(e)}")
@@ -106,9 +106,12 @@ def get_live_financial_data(stock_code):
             
             # 컨센서스 컬럼 위치 매핑 안전 슬라이싱 (유동적인 칼럼 개수 방어)
             if len(eps_values) >= 5:
-                val_this = eps_values[-2].replace(",", "").strip() # 올해(2026) 예측 실적 자동 타겟
-                val_next = eps_values[-1].replace(",", "").strip() # 내년(2027) 예측 실적 자동 타겟
-
+                try:
+                    val_this = eps_values[-2].replace(",", "").strip()
+                    val_next = eps_values[-1].replace(",", "").strip()
+                except IndexError:
+                    val_this, val_next = '-', '-'
+                
                 if val_this != '-' and val_next != '-':
                     eps_this = int(val_this)
                     eps_next = int(val_next)
