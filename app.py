@@ -15,7 +15,6 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
-def get_stock_code_by_name(stock_name):
     # 1. 수정한 완벽한 내부 자동완성 주소
     search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     try:
