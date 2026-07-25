@@ -160,6 +160,7 @@ def search_stock():
     
     # 💡 1단계 디버깅 진단: 네이버 자동완성 API 원시 주소 직격 호출 테스트
     search_url = f"https://naver.com{stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
+
     try:
         response = requests.get(search_url, timeout=5)
         search_data = response.json()
