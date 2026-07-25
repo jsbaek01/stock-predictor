@@ -15,26 +15,30 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
-    """ 누락되었던 ac.finance 실시간 통합검색 서브 도메인을 완벽하게 복구했습니다. """
     search_url = f"https://naver.com{stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
     try:
         response = requests.get(search_url, timeout=5)
         search_data = response.json()
+        
+        # 💡 [RENDER 로그 강제 인젝션] 네이버가 보내준 진짜 정체를 로그창에 출력합니다.
+        print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data} ===")
+        
         if "items" in search_data and len(search_data["items"]) > 0:
-            # 네이버 통합 금융 검색 데이터 세그먼트의 첫 번째 노드 진입
-            sub_items = search_data["items"][0]
-            for item in sub_items:
-                # item[1]에 한글 종목명, item[2]에 6자리 종목코드가 실시간 매핑되어 들어옵니다.
-                if item[1].replace(" ", "") == stock_name:
-                    return item[2] # 진짜 6자리 코드(예: '005930') 추출 확정
-
-        if stock_name == "삼성전자": return "005930"
-        if stock_name == "SK하이닉스" or stock_name == "하이닉스": return "000660"
-        if stock_name == "현대차": return "005380"
+            # 네이버 자동완성 데이터셋의 첫 번째 구조 추출
+            match_list = search_data["items"][0]
+            print(f"=== [디버깅] 추출된 match_list 구조: {match_list} ===")
+            for item in match_list:
+                # 네이버 API는 [ "종목명", "종목코드", "초성", ... ] 순서로 리스트를 줍니다.
+                if len(item) > 1 and item[0].replace(" ", "") == stock_name:
+                    print(f"=== [디버깅] 매칭 성공! 종목코드: {item[1]} ===")
+                    return item[1]
+        print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
         return None
     except Exception as e:
-        print(f"Stock Code Mapping Failed: {str(e)}")
+        # 💡 에러 발생 시 Render 로그창에 빨간색으로 범인을 찍어버립니다.
+        print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
         return None
+
 
 class ForwardPricePredictor:
     def __init__(self, eps_this_year, eps_next_year):
