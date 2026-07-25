@@ -159,7 +159,7 @@ def search_stock():
     stock_name = req_data.get("stock_name", "").strip()
     
     # 💡 1단계 디버깅 진단: 네이버 자동완성 API 원시 주소 직격 호출 테스트
-    search_url = f"https://naver.com{stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
+    search_url = f"https://naver.com?q={stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
 
     try:
         response = requests.get(search_url, timeout=5)
