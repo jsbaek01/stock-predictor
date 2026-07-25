@@ -25,6 +25,10 @@ def get_stock_code_by_name(stock_name):
             for item in match_list:
                 if item.replace(" ", "") == stock_name:
                     return item  # 6자리 표준 종목 코드 반환
+           
+        if stock_name == "삼성전자": return "005930"
+        if stock_name == "SK하이닉스" or stock_name == "하이닉스": return "000660"
+        if stock_name == "현대차": return "005380"
         return None
     except Exception as e:
         print(f"Stock Code Mapping Failed: {str(e)}")
