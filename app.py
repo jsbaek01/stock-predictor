@@ -8,14 +8,14 @@ app = Flask(__name__)
 
 @app.after_request
 def after_request(response):
-    """ Vercel 프론트엔드와 Render 백엔드 간의 교차 출처 차단 정책을 해제합니다. """
+    """ Vercel 프론트엔드와 Render 백엔드 간의 도메인 교차 출처 차단 정책을 해제합니다. """
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
     return response
 
 def get_stock_code_by_name(stock_name):
-    """ 누락되었던 ac.finance 서브 도메인을 완벽하게 복구하여 실시간 코드를 가로챕니다. """
+    """ 누락되었던 ac.finance 실시간 통합검색 서브 도메인을 완벽하게 복구했습니다. """
     search_url = f"https://naver.com{stock_name}&q_enc=euc-kr&st=1&frm=stock&r_format=json"
     try:
         response = requests.get(search_url, timeout=5)
@@ -36,7 +36,6 @@ class ForwardPricePredictor:
         self.eps_next_year = eps_next_year if eps_next_year and eps_next_year > 0 else self.eps_this_year
 
     def calculate_daily_forward_eps(self, target_date):
-        """ 윤년과 평년 캘린더 일수를 자동 추적하여 12M Forward EPS를 선형 가중 연산합니다. """
         if isinstance(target_date, str):
             target_date = datetime.datetime.strptime(target_date, "%Y-%m-%d").date()
         year = target_date.year
@@ -44,16 +43,15 @@ class ForwardPricePredictor:
         total_days = 366 if is_leap else 365
         day_of_year = target_date.timetuple().tm_yday
         days_remaining = total_days - day_of_year
-        
         forward_eps = (self.eps_this_year * (days_remaining / total_days)) + (self.eps_next_year * (day_of_year / total_days))
         return round(forward_eps, 2)
 
     def predict_price(self, target_date, target_per):
-        """ 대한민국 거래소 통화 호가 단위인 백원 단위 라운딩을 집행합니다. """
         per_multiple = target_per if target_per and target_per > 0 else 10.0
         fwd_eps = self.calculate_daily_forward_eps(target_date)
         predicted_price = per_multiple * fwd_eps
         return int(round(predicted_price, -2))
+
 
 
 # =====================================================================
@@ -180,8 +178,6 @@ def search_stock():
 # =====================================================================
 # PART 6. INFRA DEPLOYMENT EXECUTER
 # =====================================================================
-# 매직 메서드 명 구조 무결 가동 확인 완료
 if __name__ == "__main__":
     # 클라우드 인프라 아키텍처 및 로컬 테스트 범용 10000 포트 개방
     app.run(host="0.0.0.0", port=10000, debug=True)
-
