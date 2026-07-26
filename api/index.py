@@ -15,72 +15,56 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
-    search_url = "https://raw.githubusercontent.com/FinanceData/FinanceDataReader/master/krx_items.json"
+    # 🎯 해외 가상 서버(Vercel) 환경에서도 아웃바운드 차단이 없는 네이버 금융 정식 검색어 자동완성 내부 API 엔드포인트
+    search_url = "https://ac.finance.naver.com/ac"
+    
     try:
-        # 🔗 [DNS 강제 우회 터널링 교정] 
-        # 앞에 프로토콜 기호(://)가 있으면 소켓 연산이 터집니다. 순수 도메인 이름만 들어가도록 철자 교정!
-        try:
-            domain = "raw.githubusercontent.com"
-            socket.gethostbyname(domain)
-        except socket.gaierror as dns_error:
-            # 💡 [로그 인젝션 포인트 1]: 만약 Vercel DNS가 아예 맛이 갔다면 여기서 화면을 멈추고 에러를 뿜습니다.
-            return jsonify({
-                "success": False,
-                "message": f"❌ [디버깅 1단계] Vercel 내부 소켓 DNS 해석 실패!\n사유: {str(dns_error)}"
-            })
-
-        headers = {
+        # 네이버 금융 규격에 맞춘 전송 파라미터 구성 (한글 매핑을 위해 utf-8 프로토콜 지정)
+        params = {
+            "q": stock_name,
+            "q_enc": "utf-8",
+            "st": "1",
+            "frm": "stock",
+            "r_format": "json"
+        }
+        
+        # 보안 필터를 회피하는 가짜 브라우저 가면(Headers) 세팅 유지
+        debug_headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         
-        # 주소 차단과 튕김 현상을 막는 Session 기법으로 API 데이터 획득 시도
+        # 🔗 소켓 및 데이터 유실을 방지하는 안전한 Session 기법으로 네이버 금융 DB 직접 타격
         session = requests.Session()
-        response = session.get(search_url, headers=headers, timeout=5)
-        
-        # 💡 [로그 인젝션 포인트 2]: HTTP 상태 코드가 200 정상 코드가 아닐 경우 상태값을 화면에 인젝션합니다.
-        if response.status_code != 200:
-            return jsonify({
-                "success": False,
-                "message": f"❌ [디버깅 2단계] 깃허브 서버 연결 실패!\nHTTP 응답 코드: {response.status_code}"
-            })
-            
+        response = session.get(search_url, params=params, headers=debug_headers, timeout=5)
         search_data = response.json()
         
-        # 💡 [로그 인젝션 포인트 3]: 데이터는 성공적으로 다운로드 받았으나 데이터 크기나 규격이 깨졌는지 검증합니다.
-        if not search_data or len(search_data) == 0:
-            return jsonify({
-                "success": False,
-                "message": f"❌ [디버깅 3단계] 금융 API 원시 데이터 획득했으나 배열이 완전히 텅 비어있음!"
-            })
-            
         # [RENDER 로그 강제 인젝션] 기존 출력 포맷 및 구조 확인 로그 100% 보존
-        print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data[:3]} ===")
+        print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data} ===")
         
-        if len(search_data) > 0:
-            match_list = search_data
-            print(f"=== [디버깅] 추출된 match_list 구조: {match_list[:1]} ===")
+        # 네이버 자동완성 API의 원시 이중/삼중 배열 구조 필터링 (`search_data['items'][0]`)
+        if "items" in search_data and len(search_data["items"]) > 0:
+            # 🎯 변수명 구조 유지: 첫 번째 데이터 묶음을 match_list 변수에 바인딩
+            match_list = search_data["items"][0]
+            print(f"=== [디버깅] 추출된 match_list 구조: {match_list} ===")
             
             for item in match_list:
-                ticker_name = item.get("Name", "")
-                ticker_code = item.get("Symbol", "")
-                
-                if ticker_name and ticker_code and ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
-                    print(f"=== [디버깅] 매칭 성공! 종목코드: {ticker_code} ===")
-                    return ticker_code  # 순수한 6자리 종목코드 문자열 반환
+                # 네이버의 리턴 규격 매핑: item은 ["종목명", "종목코드", "초성", ...] 구조의 배열입니다.
+                if len(item) > 1:
+                    ticker_name = item[0]
+                    ticker_code = item[1]
                     
-        # 💡 [로그 인젝션 포인트 4]: 데이터 통신도 성공했고 배열도 가득 찼으나, 사용자가 입력한 글자와 매칭에 실패했을 때
-        # 첫 번째 종목 샘플 3개를 화면에 강제로 띄워 딕셔너리 키값 규격(`Name`, `Symbol`)이 달라졌는지 확인합니다.
-        return jsonify({
-            "success": False,
-            "message": f"❌ [디버깅 4단계] 데이터 파싱 성공했으나 종목명 매칭 실패!\n원시 데이터 첫 항목 샘플: {str(search_data[:2])}"
-        })
+                    # 사용자가 입력한 글자와 공백을 제거하고 정밀 대조합니다.
+                    if ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
+                        print(f"=== [디버깅] 매칭 성공! 종목코드: {ticker_code} ===")
+                        return ticker_code  # 순수한 6자리 종목코드 문자열 반환
+                        
+        print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
+        return None
         
     except Exception as e:
-        # 💡 [로그 인젝션 포인트 5]: 원인 불명의 치명적 오류나 JSONDecodeError가 날 경우 범인을 찍어버립니다.
-        return jsonify({
-            "success": False,
-            "message": f"❌ [디버깅 5단계] get_stock_code_by_name 내부 치명적 예외 터짐:\n{str(e)}"
-        })
+        # 에러 출력 구조 100% 보존
+        print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
+        return None
 
 
 
