@@ -142,6 +142,7 @@ def get_live_financial_data(stock_code):
     
     # 보안 가짜 가면(Headers) 세팅 완벽 유지
     headers = {
+        "Content-Type": "application/json"
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
@@ -150,12 +151,12 @@ def get_live_financial_data(stock_code):
     
     # 🎯 [1단계 현재가 구출] Vercel 환경에서 인터넷 해석 차단이 절대 없는 야후 파이낸스 실시간 주소 타격
     # 정식 대문자 자산 규격인 .KS(코스피 접미사)를 기본값 포맷으로 자동 결합 빌드합니다.
-    price_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance?code={stock_code}"
+    price_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance"
     
     try:
         # 소켓 유실과 튕김 현상을 원천 방어하는 requests의 Session 통신 기법 적용
         session = requests.Session()
-        price_res = session.get(price_url, headers=headers, timeout=5)
+        price_res = session.post(price_url, json={"stock_code": stock_code}, headers=headers, timeout=7)
         
         # 💡 [디버깅 1단계]: 야후 시세 서버 연결 자체가 아예 실패했을 때
         if price_res.status_code != 200:
@@ -167,9 +168,8 @@ def get_live_financial_data(stock_code):
         # 만약 코스피 종목이 아니어서 야후 서버가 에러 코드를 뱉었다면, 
         # 즉시 코스닥 전용 규격인 .KQ 접미사 주소로 자동 전환하여 2차 통신을 안전하게 완수합니다.
         if price_res.status_code != 200:
-            price_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance?code={stock_code}"
-            price_res = session.get(price_url, headers=headers, timeout=5)
-       
+            price_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance"
+            price_res = session.post(price_url, json={"stock_code": stock_code}, headers=headers, timeout=7)
         
         price_data = price_res.json()
         
@@ -189,7 +189,7 @@ def get_live_financial_data(stock_code):
         
     # 🎯 [2단계: 컨센서스 구출] 해외 서버를 절대 차단하지 않는 FnGuide 원천 데이터 공급 CDN 서버 주소 직격 타격
     # 글자 짤림 및 왜곡 현상이 완벽히 방지된 공식 청정 데이터 엔드포인트 라인입니다.
-    finance_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance?code={stock_code}"
+    finance_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance"
     
     # 대원칙 적용: 질문자님의 기존 정규식 연산 대상 변수명 100% 보존
     eps_this = None
@@ -200,7 +200,7 @@ def get_live_financial_data(stock_code):
     
     try:
         session = requests.Session()
-        finance_res = session.get(finance_url, headers=headers, timeout=5)
+        finance_res = session.post(finance_url, json={"stock_code": stock_code}, headers=headers, timeout=7)
 
         # 💡 [디버깅 3단계]: FnGuide CDN 서버 응답 에러 캐치
         if finance_res.status_code != 200:
