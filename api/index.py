@@ -221,12 +221,6 @@ def get_live_financial_data(stock_code):
         if per_match:
             per_multiple = float(per_match.group(1))
 
-        # HTML 내부 텍스트의 앞부분 200자를 팝업창에 강제로 찍어 정규식 파괴 여부를 판별합니다.
-        if "추정기관수" not in html_text:
-            return jsonify({
-                "success": False,
-                "message": f"❌ [정규식 매칭 실패] HTML 소스 내부에 '추정기관수' 문자열이 존재하지 않습니다.\n원시 HTML 소스 앞부분: {html_text[:200]}"
-            })
             
         # 올해 및 내년 예상 EPS 행 세그먼트 슬라이싱 파서
         eps_row_match = re.search(r'EPS\(원\).*?</tr>', html_text, re.DOTALL)
