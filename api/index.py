@@ -138,6 +138,11 @@ class ForwardPricePredictor:
 # PART 4. LIVE FINANCE WEB SCRAPER (CONSEN & COUNT)
 # ========================================================
 def get_live_financial_data(stock_code):
+
+    return jsonify({
+                "success": False,
+                "message": f"❌ [현재가 오류]"
+            })    
     # 보안 가짜 가면(Headers) 세팅 완벽 유지
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
