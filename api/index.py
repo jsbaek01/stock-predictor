@@ -165,18 +165,16 @@ def get_live_financial_data(stock_code):
                 "message": f"❌ [현재가 오류] 야후 시세 서버 연결 실패!\n응답 코드: {price_res.status_code}"
             })
             
-        # 만약 코스피 종목이 아니어서 야후 서버가 에러 코드를 뱉었다면, 
-        # 즉시 코스닥 전용 규격인 .KQ 접미사 주소로 자동 전환하여 2차 통신을 안전하게 완수합니다.
-        if price_res.status_code != 200:
-            price_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance"
-            price_res = session.post(price_url, json={"stock_code": stock_code}, headers=headers, timeout=7)
+         
+        raw_data = price_res.json()
+        current_price = raw_data.get("current_price", 0)
         
-        price_data = price_res.json()
-        
-        # 🎯 야후 정제 JSON 패킷 데이터 노드 최단 경로 직격 가로채기
-        # 구조: data['chart']['result']['meta']['regularMarketPrice']
-        # 이 자리에 실시간 가격 정수 변수가 그대로 박혀 있어 정규식 크롤링보다 속도가 10배 이상 빠릅니다.
-        current_price = int(price_data['chart']['result'][0]['meta']['regularMarketPrice'])
+        # 🎯 [버그 수정 3]: 코랩의 이름표("per")를 질문자님의 기존 변수명(per_multiple)에 자석처럼 결합!
+        eps_this = raw_data.get("eps_this")
+        eps_next = raw_data.get("eps_next")
+        per_multiple = raw_data.get("per") # ➔ 코랩이 보낸 "per"를 per_multiple 변수에 정교하게 대입!
+        est_count = raw_data.get("est_count", 0)
+        is_consensus_exist = raw_data.get("is_consensus", False)
         
         print(f"=== [디버깅] 야후 금융 망 시세 패킷 동기화 성공 -> 현재가: {current_price}원 ===")
         
@@ -186,7 +184,7 @@ def get_live_financial_data(stock_code):
             "success": False,
             "message": f"❌ [현재가 파싱 오류] 야후 JSON 구조 해석 실패!\n사유: {str(e)}"
         })
-        
+    """    
     # 🎯 [2단계: 컨센서스 구출] 해외 서버를 절대 차단하지 않는 FnGuide 원천 데이터 공급 CDN 서버 주소 직격 타격
     # 글자 짤림 및 왜곡 현상이 완벽히 방지된 공식 청정 데이터 엔드포인트 라인입니다.
     finance_url = f"https://26f1-34-24-4-191.ngrok-free.app/fetch_finance"
@@ -261,7 +259,7 @@ def get_live_financial_data(stock_code):
             "success": False,
             "message": f"❌ [재무 엔진 크래시] 내부 정규식 연산 최종 폭발!\n원인: {str(e)}"
         })
-        
+    """    
     # 🎯 [3단계: 소형주 예외 방어선] 컨센서스 미발행 종목 발생 시 가동되는 질문자님의 핵심 보정 알고리즘
     if not is_consensus_exist or est_count == 0 or not eps_this:
         est_count = 0
