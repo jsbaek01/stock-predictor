@@ -157,6 +157,13 @@ def get_live_financial_data(stock_code):
         session = requests.Session()
         price_res = session.get(price_url, headers=headers, timeout=5)
         
+        # 💡 [디버깅 1단계]: 야후 시세 서버 연결 자체가 아예 실패했을 때
+        if price_res.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [현재가 오류] 야후 시세 서버 연결 실패!\n응답 코드: {price_res.status_code}"
+            })
+            
         # 만약 코스피 종목이 아니어서 야후 서버가 에러 코드를 뱉었다면, 
         # 즉시 코스닥 전용 규격인 .KQ 접미사 주소로 자동 전환하여 2차 통신을 안전하게 완수합니다.
         if price_res.status_code != 200:
@@ -174,8 +181,12 @@ def get_live_financial_data(stock_code):
         print(f"=== [디버깅] 야후 금융 망 시세 패킷 동기화 성공 -> 현재가: {current_price}원 ===")
         
     except Exception as e:
-       print(f"=== [디버깅] 야후 금융 망 시세 패킷 동기화 성공")
-
+        # 💡 [디버깅 2단계]: 야후 JSON 패킷 구조 에러 캐치
+        return jsonify({
+            "success": False,
+            "message": f"❌ [현재가 파싱 오류] 야후 JSON 구조 해석 실패!\n사유: {str(e)}"
+        })
+        
     # 🎯 [2단계: 컨센서스 구출] 해외 서버를 절대 차단하지 않는 FnGuide 원천 데이터 공급 CDN 서버 주소 직격 타격
     # 글자 짤림 및 왜곡 현상이 완벽히 방지된 공식 청정 데이터 엔드포인트 라인입니다.
     finance_url = f"https://cdn.finance.naver.com/component/widget/chart/company/cfinance/{stock_code}.html"
@@ -191,7 +202,12 @@ def get_live_financial_data(stock_code):
         session = requests.Session()
         finance_res = session.get(finance_url, headers=headers, timeout=5)
 
-        
+        # 💡 [디버깅 3단계]: FnGuide CDN 서버 응답 에러 캐치
+        if finance_res.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [재무 통신 오류] FnGuide CDN 서버 응답 실패!\n상태 코드: {finance_res.status_code}"
+            })
             
         finance_res.encoding = 'utf-8' # FnGuide 공식 서버 규격인 국룰 인코딩 설정
         html_text = finance_res.text
@@ -218,7 +234,12 @@ def get_live_financial_data(stock_code):
             eps_row_html = eps_row_match.group(0)
             eps_values = re.findall(r'<td[^>]*>([\d,-]+)</td>', eps_row_html)
 
-            
+            # 💡 [디버깅 5단계]: td 태그 내부에서 수집한 숫자 리스트 개수가 부족하여 슬라이싱이 깨질 때
+            if len(eps_values) < 5:
+                return jsonify({
+                    "success": False,
+                    "message": f"❌ [EPS 배열 부족] td 태그에서 파싱된 데이터 개수가 부족합니다.\n추출된 배열: {str(eps_values)}"
+                })
                 
             # 기존 컬럼 인덱스 슬라이싱 매핑 구조 완벽 보존
             if len(eps_values) >= 5:
@@ -235,7 +256,11 @@ def get_live_financial_data(stock_code):
         print(f"=== [디버깅] FnGuide 재무 데이터 동기화 완료 -> 추정기관: {est_count}개 / 선행PER: {per_multiple} / 올해EPS: {eps_this} ===")
                     
     except Exception as e:
-        print(f"=== [디버깅] FnGuide 재무 데이터 동기화")
+        # 💡 [디버깅 6단계]: 정규식 연산 영역 최종 예외 폭발 캐치
+        return jsonify({
+            "success": False,
+            "message": f"❌ [재무 엔진 크래시] 내부 정규식 연산 최종 폭발!\n원인: {str(e)}"
+        })
         
     # 🎯 [3단계: 소형주 예외 방어선] 컨센서스 미발행 종목 발생 시 가동되는 질문자님의 핵심 보정 알고리즘
     if not is_consensus_exist or est_count == 0 or not eps_this:
@@ -284,6 +309,13 @@ def search_stock():
     # 🎯 [논리 오류 대수술]: 중간에 함수를 죽여 백엔드를 멈추던 가짜 야후 크롤러 코드를 완전히 걷어내고,
     # 2단계에서 완벽 복구한 실시간 네이버 시세 패치 및 가이던스 파싱 엔진으로 흐름을 정상 도킹합니다.
     raw_data = get_live_financial_data(code)
+
+    # 라우터가 가로채서 프론트엔드 브라우저 화면으로 곧바로 리턴(토스)시켜 버립니다.
+    if isinstance(raw_data, Flask.response_class) or not raw_data:
+        if not raw_data:
+            return jsonify({"success": False, "message": "거래소 데이터 수신 결과가 비어있습니다."})
+        return raw_data # 내부 함수가 보낸 디버깅 1~8단계 로그 팝업창을 화면에 즉시 띄움
+        
     if raw_data["current_price"] == 0:
         return jsonify({"success": False, "message": "거래소 실시간 시세 패킷 동기화 실패"})
         
