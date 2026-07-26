@@ -19,6 +19,20 @@ def after_request(response):
 
 def get_stock_code_by_name(stock_name):
     try:
+        data_url = "https://githubusercontent.com"
+        response = requests.get(data_url, timeout=5)
+        stock_list = response.json()
+        
+        for item in stock_list:
+            if item.get("Name", "").replace(" ", "") == stock_name.replace(" ", ""):
+                return item.get("Symbol")
+        return None
+    except:
+        return None
+
+"""
+def get_stock_code_by_name(stock_name):
+    try:
         # 1. 오늘 날짜 기준으로 코스피/코스닥에 상장된 모든 종목코드(티커) 리스트 확보
         # 네이버를 찌르지 않고 가상 서버 환경에서도 차단 없이 안전하게 데이터를 가져옵니다.
         match_list = stock.get_market_ticker_list()
@@ -44,7 +58,7 @@ def get_stock_code_by_name(stock_name):
         # 에러 발생 시 Render 로그창에 범인을 찍어버립니다.
         print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
         return None
-
+"""
 
 class ForwardPricePredictor:
     def __init__(self, eps_this_year, eps_next_year):
