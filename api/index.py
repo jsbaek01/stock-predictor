@@ -36,16 +36,45 @@ def get_stock_code_by_name(stock_name):
         # 🔗 소켓 및 데이터 유실을 방지하는 안전한 Session 기법으로 네이버 금융 DB 직접 타격
         session = requests.Session()
         response = session.get(search_url, params=params, headers=debug_headers, timeout=5)
+        
+        # 💡 [로그 인젝션 1단계]: HTTP 연결 자체가 실패했거나 상태 코드가 200이 아닐 때 튕겨냅니다.
+        if response.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [네이버 통신 실패] HTTP 응답 코드: {response.status_code}\n서버 주소가 차단되었거나 도메인이 잘못되었습니다."
+            })
+            
         search_data = response.json()
         
         # [RENDER 로그 강제 인젝션] 기존 출력 포맷 및 구조 확인 로그 100% 보존
         print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data} ===")
         
+        # 💡 [로그 인젝션 2단계]: 네이버가 정상 응답을 줬으나 내부 데이터가 완전히 텅 비어있는지 확인합니다.
+        if not search_data:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [데이터 공백] 네이버로부터 아무런 JSON 데이터를 받아오지 못했습니다."
+            })
+            
+        # 💡 [로그 인젝션 3단계]: 네이버 금융 사전에 'items' 키가 존재하지 않거나 데이터가 없을 때 구조를 뿜어냅니다.
+        if "items" not in search_data or len(search_data["items"]) == 0:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [구조 오류] 'items' 노드가 유실되었거나 검색 결과가 없습니다.\n네이버 원시 데이터: {str(search_data)}"
+            })
+            
         # 네이버 자동완성 API의 원시 이중/삼중 배열 구조 필터링 (`search_data['items'][0]`)
         if "items" in search_data and len(search_data["items"]) > 0:
             # 🎯 변수명 구조 유지: 첫 번째 데이터 묶음을 match_list 변수에 바인딩
             match_list = search_data["items"][0]
             print(f"=== [디버깅] 추출된 match_list 구조: {match_list} ===")
+            
+            # 💡 [로그 인젝션 4단계]: 대괄호 한 껍질을 벗겼는데 match_list 내부 배열 자체가 유실되었는지 확인합니다.
+            if not match_list or len(match_list) == 0:
+                return jsonify({
+                    "success": False,
+                    "message": f"❌ [구역 공백] items[0] 데이터 구역이 비어있습니다.\n원시 데이터: {str(search_data)}"
+                })
             
             for item in match_list:
                 # 네이버의 리턴 규격 매핑: item은 ["종목명", "종목코드", "초성", ...] 구조의 배열입니다.
@@ -59,12 +88,21 @@ def get_stock_code_by_name(stock_name):
                         return ticker_code  # 순수한 6자리 종목코드 문자열 반환
                         
         print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
-        return None
+        
+        # 💡 [로그 인젝션 5단계]: 통신도 됐고 배열 데이터도 꽉 차서 들어왔는데, 글자 대조 단계에서 글자가 깨졌거나 일치하지 않아 실패한 경우
+        # 추출된 첫 번째 주식명 항목 구조를 화면 팝업창에 그대로 인젝션해서 눈으로 강제 대조하게 만듭니다.
+        return jsonify({
+            "success": False,
+            "message": f"🔍 [네이버 통신 및 구조 파싱 성공!]\n단, 글자 매칭 실패.\n입력값: '{stock_name}'\n네이버 첫번째 결과값 샘플: {str(match_list[0] if len(match_list) > 0 else '없음')}"
+        })
         
     except Exception as e:
-        # 에러 출력 구조 100% 보존
+        # 에러 출력 구조 100% 보존 및 화면 강제 토스
         print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
-        return None
+        return jsonify({
+            "success": False,
+            "message": f"❌ [get_stock_code_by_name 치명적 예외 발생]\n원인: {str(e)}"
+        })
 
 
 
