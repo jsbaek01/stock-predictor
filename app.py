@@ -16,30 +16,30 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
-    # 1. 수정한 완벽한 내부 자동완성 주소
-    search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     try:
-        response = requests.get(search_url, timeout=5)
-        search_data = response.json()
+        # 1. 오늘 날짜 기준으로 코스피/코스닥에 상장된 모든 종목코드(티커) 리스트 확보
+        # 네이버를 찌르지 않고 가상 서버 환경에서도 차단 없이 안전하게 데이터를 가져옵니다.
+        match_list = stock.get_market_ticker_list()
         
-        # [RENDER 로그 강제 인젝션] 네이버 원시 데이터 출력
-        print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data} ===")
+        # [RENDER 로그 강제 인젝션] 가져온 상장 주식 마켓 데이터 리스트 출력
+        print(f"=== [디버깅] 거래소 엔진 데이터 확보 성공 (총 {len(match_list)}개 종목) ===")
+        print(f"=== [디버깅] 추출된 match_list 구조(일부): {match_list[:5]} ===")
         
-        if "items" in search_data and len(search_data["items"]) > 0:
-            # 🎯 교정 핵심: items의 첫 번째 인덱스 내부 배열을 순회 데이터셋으로 타격합니다.
-            match_list = search_data["items"][0]
-            print(f"=== [디버깅] 추출된 match_list 구조: {match_list} ===")
+        for item in match_list:
+            # item 변수 하나에는 '005930' 같은 순수한 종목코드가 들어옵니다.
+            # stock.get_market_ticker_name(item) 함수를 쓰면 해당 코드의 진짜 종목명을 알아낼 수 있습니다.
+            ticker_name = stock.get_market_ticker_name(item)
             
-            for item in match_list:
-                # 🎯 item 구조는 ["삼성전자", "005930", "삼설전다", ...] 형태의 리스트입니다.
-                # item[0][0] 구조가 아니라 1차원 데이터의 0번 인덱스(종목명)와 1번 인덱스(코드)를 바라봅니다.
-                if len(item) > 1 and item[0].replace(" ", "") == stock_name.replace(" ", ""):
-                    print(f"=== [디버깅] 매칭 성공! 종목코드: {item[1]} ===")
-                    return item[1]
-                    
-        print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
+            # 사용자가 입력한 종목명과 공백을 제거하고 정밀 비교합니다.
+            if ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
+                print(f"=== [디버깅] 매칭 성공! 종목명: {ticker_name} -> 종목코드: {item} ===")
+                return item  # 정상적인 종목코드(예: '005930') 반환
+                
+        print("=== [디버깅] 거래소 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
         return None
+        
     except Exception as e:
+        # 에러 발생 시 Render 로그창에 범인을 찍어버립니다.
         print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
         return None
 
