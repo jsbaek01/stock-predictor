@@ -3,6 +3,7 @@ import datetime
 import requests
 import re
 from flask import Flask, jsonify, request
+from pykrx import stock
 
 app = Flask(__name__)
 
@@ -152,7 +153,7 @@ def get_live_financial_data(stock_code):
 
 # =====================================================================
 # PART 5. MAIN BUSINESS API CONTROLLER
-# =====================================================================
+
 @app.route("/search", methods=["POST"])
 def search_stock():
     req_data = request.get_json()
@@ -161,25 +162,35 @@ def search_stock():
         
     stock_name = req_data.get("stock_name", "").strip()
     
-    # 💡 1단계 디버깅 진단: 네이버 자동완성 API 원시 주소 직격 호출 테스트
-    search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     try:
-        # 💡 네이버 보안 필터를 완벽히 우회하는 브라우저 가짜 가면(Headers) 주입
-        debug_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        response = requests.get(search_url, headers=debug_headers, timeout=5)
-        search_data = response.json()
-    except Exception as e:
-        return jsonify({"success": False, "message": f"❌ 네이버 접속 자체가 실패함: {str(e)}"})
+        # 🎯 1. 오늘 날짜 기준으로 코스피/코스닥에 상장된 모든 종목코드(티커) 리스트 확보
+        # 이 함수는 가상 서버 환경에서도 차단 없이 안전하게 데이터를 가져옵니다.
+        tickers = stock.get_market_ticker_list()
         
-    # 💡 [화면 강제 로그 인젝션 1] 네이버가 준 전체 원시 JSON을 프론트엔드 알림창으로 즉시 쏴버립니다.
-    # 만약 이 팝업창에 데이터가 텅 비어있다면 네이버 IP 차단이 확실한 것입니다.
-    if stock_name and ("items" in search_data):
-        return jsonify({
-            "success": False, 
-            "message": f"🔍 [네이버 원시 데이터 획득 성공]\n전체 배열 구조: {str(search_data['items'])}"
-        })
+        stock_code = None
+        # 🎯 2. 전체 종목을 돌며 사용자가 입력한 종목명과 일치하는 코드가 있는지 매칭
+        for ticker in tickers:
+            ticker_name = stock.get_market_ticker_name(ticker)
+            if ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
+                stock_code = ticker
+                break
+                
+        # 💡 [화면 강제 로그 인젝션] 질문자님의 디버깅 스타일 유지
+        # 정상적으로 코드를 찾았든 못 찾았든 원시 탐색 결과를 무조건 리턴하여 화면에 띄웁니다.
+        if stock_code:
+            return jsonify({
+                "success": False,  # 기존 테스트 흐름 유지를 위해 False로 유지 (원하면 True로 변경 가능)
+                "message": f"🔍 [KRX 엔진 데이터 획득 성공]\n종목명: {stock_name} -> 매칭된 종목코드: [{stock_code}]"
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": f"❌ '{stock_name}'에 해당하는 종목코드를 거래소 사전에서 찾을 수 없습니다."
+            })
+            
+    except Exception as e:
+        # 버셀 네트워크 단에서 또 다른 예외가 발생하는지 모니터링하기 위한 예외 처리구문
+        return jsonify({"success": False, "message": f"❌ 거래소 사전 조회 실패: {str(e)}"})
 
     # 이하 코드는 혹시 모를 다음 단계를 위해 기존 흐름을 유지합니다.
     code = get_stock_code_by_name(stock_name)
