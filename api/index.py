@@ -3,6 +3,7 @@ import datetime
 import requests
 import re
 from flask import Flask, jsonify, request
+from api.stock_data import MASTER_STOCK_DATA
 
 app = Flask(__name__)
 
@@ -19,6 +20,7 @@ def get_stock_code_by_name(stock_name):
     search_url = "https://ac.finance.naver.com/ac"
     
     try:
+        """
         # 네이버 금융 규격에 맞춘 전송 파라미터 구성 (한글 매핑을 위해 utf-8 프로토콜 지정)
         params = {
             "q": stock_name,
@@ -45,6 +47,8 @@ def get_stock_code_by_name(stock_name):
             })
             
         search_data = response.json()
+        """
+        search_data = MASTER_STOCK_DATA
         
         # [RENDER 로그 강제 인젝션] 기존 출력 포맷 및 구조 확인 로그 100% 보존
         print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data} ===")
