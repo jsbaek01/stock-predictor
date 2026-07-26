@@ -176,7 +176,7 @@ def get_live_financial_data(stock_code):
         # 🎯 야후 정제 JSON 패킷 데이터 노드 최단 경로 직격 가로채기
         # 구조: data['chart']['result']['meta']['regularMarketPrice']
         # 이 자리에 실시간 가격 정수 변수가 그대로 박혀 있어 정규식 크롤링보다 속도가 10배 이상 빠릅니다.
-        current_price = int(price_data['chart']['result']['meta']['regularMarketPrice'])
+        current_price = int(price_data['chart']['result'][0]['meta']['regularMarketPrice'])
         
         print(f"=== [디버깅] 야후 금융 망 시세 패킷 동기화 성공 -> 현재가: {current_price}원 ===")
         
