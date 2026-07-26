@@ -160,7 +160,14 @@ def get_live_financial_data(stock_code):
         if price_res.status_code != 200:
             price_url = f"https://yahoo.com{stock_code}.KQ"
             price_res = session.get(price_url, headers=headers, timeout=5)
-            
+       
+        # 💡 [디버깅 1단계 인젝션]: 야후 서버 연결 자체가 실패하여 응답 코드가 비정상일 때
+        if price_res.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [현재가 오류] 야후 시세 서버 연결 실패!\n응답 코드: {price_res.status_code}"
+
+            })    
         price_data = price_res.json()
         
         # 🎯 야후 정제 JSON 패킷 데이터 노드 최단 경로 직격 가로채기
@@ -171,8 +178,11 @@ def get_live_financial_data(stock_code):
         print(f"=== [디버깅] 야후 금융 망 시세 패킷 동기화 성공 -> 현재가: {current_price}원 ===")
         
     except Exception as e:
-        # 기존 질문자님의 디버깅용 print 로그 스타일 완벽 보존
-        print(f"Live Price API Network Error: {str(e)}")
+        # 💡 [디버깅 2단계 인젝션]: 야후 JSON 패킷 구조가 바뀌었거나 파싱 도중 예외가 터졌을 때
+        return jsonify({
+            "success": False,
+            "message": f"❌ [현재가 파싱 오류] 야후 JSON 구조 해석 실패!\n사유: {str(e)}"
+        })
 
     # 🎯 [2단계: 컨센서스 구출] 해외 서버를 절대 차단하지 않는 FnGuide 원천 데이터 공급 CDN 서버 주소 직격 타격
     # 글자 짤림 및 왜곡 현상이 완벽히 방지된 공식 청정 데이터 엔드포인트 라인입니다.
@@ -188,6 +198,14 @@ def get_live_financial_data(stock_code):
     try:
         session = requests.Session()
         finance_res = session.get(finance_url, headers=headers, timeout=5)
+
+        # 💡 [디버깅 3단계 인젝션]: FnGuide CDN 서버 연결 실패 시 상태 코드 출력
+        if finance_res.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [재무 통신 오류] FnGuide CDN 서버 응답 실패!\n상태 코드: {finance_res.status_code}\n종목코드 [{stock_code}]의 데이터가 없을 수 있습니다."
+            })
+            
         finance_res.encoding = 'utf-8' # FnGuide 공식 서버 규격인 국룰 인코딩 설정
         html_text = finance_res.text
         
@@ -202,12 +220,35 @@ def get_live_financial_data(stock_code):
         per_match = re.search(r'선행\s*PER.*?<em[^>]*>([\d.]+)</em>', html_text, re.DOTALL)
         if per_match:
             per_multiple = float(per_match.group(1))
+
+        # HTML 내부 텍스트의 앞부분 200자를 팝업창에 강제로 찍어 정규식 파괴 여부를 판별합니다.
+        if "추정기관수" not in html_text:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [정규식 매칭 실패] HTML 소스 내부에 '추정기관수' 문자열이 존재하지 않습니다.\n원시 HTML 소스 앞부분: {html_text[:200]}"
+            })
             
         # 올해 및 내년 예상 EPS 행 세그먼트 슬라이싱 파서
         eps_row_match = re.search(r'EPS\(원\).*?</tr>', html_text, re.DOTALL)
+
+        # 💡 [디버깅 6단계 인젝션]: 'EPS(원)' 테이블 행 구조 매칭에 아예 실패했을 때
+        if not eps_row_match:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [EPS 테이블 실종] HTML 내부에서 'EPS(원)' 데이터 행 구조를 찾지 못했습니다."
+            })
+            
         if eps_row_match and est_count > 0:
             eps_row_html = eps_row_match.group(0)
             eps_values = re.findall(r'<td[^>]*>([\d,-]+)</td>', eps_row_html)
+
+            # 💡 [디버깅 7단계 인젝션]: td 태그 내부에서 수집한 숫자 리스트 개수가 부족하여 컬럼 접근이 불가능할 때
+            if len(eps_values) < 5:
+                return jsonify({
+                    "success": False,
+                    "message": f"❌ [EPS 배열 부족] td 태그에서 파싱된 데이터 개수가 부족합니다.\n추출된 배열: {str(eps_values)}"
+                })
+                
             # 기존 컬럼 인덱스 슬라이싱 매핑 구조 완벽 보존
             if len(eps_values) >= 5:
                 try:
@@ -223,9 +264,12 @@ def get_live_financial_data(stock_code):
         print(f"=== [디버깅] FnGuide 재무 데이터 동기화 완료 -> 추정기관: {est_count}개 / 선행PER: {per_multiple} / 올해EPS: {eps_this} ===")
                     
     except Exception as e:
-        # 기존 질문자님의 에러 출력 구조 100% 보존
-        print(f"Financial Parsing Logic Exception: {str(e)}")
-
+        # 💡 [디버깅 8단계 인젝션]: 정규식 연산 루프 전체 영역에서 예측 불가능한 런타임 크래시가 터졌을 때
+        return jsonify({
+            "success": False,
+            "message": f"❌ [재무 엔진 크래시] get_live_financial_data 내부 연산 최종 폭발!\n원인: {str(e)}"
+        })
+        
     # 🎯 [3단계: 소형주 예외 방어선] 컨센서스 미발행 종목 발생 시 가동되는 질문자님의 핵심 보정 알고리즘
     if not is_consensus_exist or est_count == 0 or not eps_this:
         est_count = 0
