@@ -1,11 +1,8 @@
-import os
-os.environ["PYTHON_VERSION"] = "3.11.9"
 
 import datetime
 import requests
 import re
 from flask import Flask, jsonify, request
-from pykrx import stock
 
 app = Flask(__name__)
 
@@ -18,16 +15,31 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
+    # 1. 수정한 완벽한 내부 자동완성 주소
+    search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     try:
-        data_url = "https://githubusercontent.com"
-        response = requests.get(data_url, timeout=5)
-        stock_list = response.json()
+        response = requests.get(search_url, timeout=5)
+        search_data = response.json()
         
-        for item in stock_list:
-            if item.get("Name", "").replace(" ", "") == stock_name.replace(" ", ""):
-                return item.get("Symbol")
+        # [RENDER 로그 강제 인젝션] 네이버 원시 데이터 출력
+        print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data} ===")
+        
+        if "items" in search_data and len(search_data["items"]) > 0:
+            # 🎯 교정 핵심: items의 첫 번째 인덱스 내부 배열을 순회 데이터셋으로 타격합니다.
+            match_list = search_data["items"][0]
+            print(f"=== [디버깅] 추출된 match_list 구조: {match_list} ===")
+            
+            for item in match_list:
+                # 🎯 item 구조는 ["삼성전자", "005930", "삼설전다", ...] 형태의 리스트입니다.
+                # item[0][0] 구조가 아니라 1차원 데이터의 0번 인덱스(종목명)와 1번 인덱스(코드)를 바라봅니다.
+                if len(item) > 1 and item[0].replace(" ", "") == stock_name.replace(" ", ""):
+                    print(f"=== [디버깅] 매칭 성공! 종목코드: {item[1]} ===")
+                    return item[1]
+                    
+        print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
         return None
-    except:
+    except Exception as e:
+        print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
         return None
 
 """
@@ -169,56 +181,40 @@ def get_live_financial_data(stock_code):
 
 # =====================================================================
 # PART 5. MAIN BUSINESS API CONTROLLER
-
 @app.route("/search", methods=["POST"])
 def search_stock():
-    # 기존 변수명 그대로 유지
     req_data = request.get_json()
     if not req_data or "stock_name" not in req_data:
         return jsonify({"success": False, "message": "Invalid Request Protocol"})
         
     stock_name = req_data.get("stock_name", "").strip()
     
+    # 🎯 [수정 완료] 금융 전용 자동완성 주소 주입 + utf-8 인코딩 설정
+    search_url = f"https://naver.com{stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
+    
     try:
-        # 🎯 1. 해외 가상 서버(Vercel/Render)에서도 절대 차단당하지 않는 오픈 금융 데이터 통합 주소
-        # pykrx 대신 requests를 활용해 데이터셋을 안전하게 원격으로 받아옵니다.
-        data_url = "https://githubusercontent.com"
-        response = requests.get(data_url, timeout=5)
-        stock_list = response.json()  # JSON 데이터 파싱
-        
-        # 기존 변수명 그대로 유지
-        stock_code = None
-        
-        # 🎯 2. 전체 종목 리스트를 돌며 사용자가 입력한 종목명과 일치하는 코드가 있는지 매칭
-        # 데이터 구조 내부의 명칭('Symbol', 'Name')을 이용해 기존 비교 로직을 완벽 대조합니다.
-        for item in stock_list:
-            ticker_name = item.get("Name", "")
-            if ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
-                stock_code = item.get("Symbol")
-                break
-                
-        # 💡 [화면 강제 로그 인젝션] 질문자님의 디버깅 스타일 및 메시지 포맷 100% 유지
-        if stock_code:
-            return jsonify({
-                "success": False,  # 기존 테스트 흐름 유지를 위해 False 그대로 유지
-                "message": f"🔍 [금융 데이터 서버 직격 성공]\n종목명: {stock_name} -> 변환된 종목코드: [{stock_code}]"
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "message": f"❌ '{stock_name}'은(는) 상장 주식 사전에 존재하지 않습니다."
-            })
-            
+        # 💡 네이버 보안 필터를 완벽히 우회하는 브라우저 가짜 가면(Headers) 주입 (유지)
+        debug_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(search_url, headers=debug_headers, timeout=5)
+        search_data = response.json()
     except Exception as e:
-        # 가상 서버 예외 처리 구조 유지
-        return jsonify({"success": False, "message": f"❌ 금융 데이터 서버 통신 실패: {str(e)}"})
-
+        return jsonify({"success": False, "message": f"❌ 네이버 접속 자체가 실패함: {str(e)}"})
+        
+    # 💡 [화면 강제 로그 인젝션 1] (유지)
+    # 이제 정상 주소를 타격하므로 에러 없이 이 조건문 안으로 들어와 프론트창에 원시 배열 구조를 정상 인젝션합니다.
+    if stock_name and ("items" in search_data):
+        return jsonify({
+            "success": False, 
+            "message": f"🔍 [네이버 원시 데이터 획득 성공]\n전체 배열 구조: {str(search_data['items'])}"
+        })
 
     # 이하 코드는 혹시 모를 다음 단계를 위해 기존 흐름을 유지합니다.
     code = get_stock_code_by_name(stock_name)
     if not code:
         return jsonify({"success": False, "message": f"'{stock_name}'은(는) 상장 주식 사전에 존재하지 않습니다."})
-        
+
     raw_data = get_live_financial_data(code)
     if raw_data["current_price"] == 0:
         return jsonify({"success": False, "message": "거래소 실시간 시세 패킷 동기화 실패"})
