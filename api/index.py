@@ -158,7 +158,7 @@ def get_live_financial_data(stock_code):
         # 만약 코스피 종목이 아니어서 야후 서버가 에러 코드를 뱉었다면, 
         # 즉시 코스닥 전용 규격인 .KQ 접미사 주소로 자동 전환하여 2차 통신을 안전하게 완수합니다.
         if price_res.status_code != 200:
-            price_url = f"https://yahoo.com{stock_code}.KQ"
+            price_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{stock_code}.KQ"
             price_res = session.get(price_url, headers=headers, timeout=5)
        
         # 💡 [디버깅 1단계 인젝션]: 야후 서버 연결 자체가 실패하여 응답 코드가 비정상일 때
