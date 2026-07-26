@@ -190,7 +190,7 @@ def search_stock():
     stock_name = req_data.get("stock_name", "").strip()
     
     # 🎯 [수정 완료] 금융 전용 자동완성 주소 주입 + utf-8 인코딩 설정
-    search_url = f"https://naver.com{stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
+    search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     
     try:
         # 💡 네이버 보안 필터를 완벽히 우회하는 브라우저 가짜 가면(Headers) 주입 (유지)
