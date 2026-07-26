@@ -1,3 +1,5 @@
+import os
+os.environ["PYTHON_VERSION"] = "3.11.9"
 
 import datetime
 import requests
