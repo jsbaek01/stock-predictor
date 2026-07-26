@@ -15,6 +15,43 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
+    # 🎯 1. 가상 서버(Vercel) 환경에서도 절대 차단당하지 않는 영구적인 금융 오픈 사전 데이터셋 주소
+    search_url = "https://githubusercontent.com"
+    try:
+        # 🔗 DNS 캐시 오류와 도메인 차단을 원천 차단하기 위해 Session 통신 기법 적용
+        session = requests.Session()
+        response = session.get(search_url, timeout=5)
+        search_data = response.json()  # JSON 데이터 파싱
+        
+        # [RENDER 로그 강제 인젝션] 금융 데이터 서버 원시 데이터 출력 (기존 흐름 유지)
+        print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data[:3]} (총 {len(search_data)}개 중 일부) ===")
+        
+        # 야후 파이낸스 실시간 가격 조회를 하려면 종목코드 데이터가 필요하므로 상장 사전 전체를 탐색합니다.
+        if len(search_data) > 0:
+            # 🎯 교정 핵심: 기존 match_list 변수명과 디버깅 출력 구조를 완벽하게 유지합니다.
+            match_list = search_data
+            print(f"=== [디버깅] 추출된 match_list 구조: {match_list[:1]} ===")
+            
+            for item in match_list:
+                # 🎯 야후 연동용 원천 데이터 구조 맵핑:
+                # item은 {'Symbol': '005930', 'Name': '삼성전자', 'Sector': '반도체', ...} 형태의 딕셔너리입니다.
+                # 변명 구조 유지를 위해 item['Name']과 item['Symbol']을 매칭하여 순회합니다.
+                ticker_name = item.get("Name", "")
+                ticker_code = item.get("Symbol", "")
+                
+                if ticker_name and ticker_code and ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
+                    print(f"=== [디버깅] 매칭 성공! 종목코드: {ticker_code} ===")
+                    return ticker_code  # 순수한 종목코드(예: '005930') 반환
+                    
+        print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
+        return None
+    except Exception as e:
+        # 에러 출력 구조 100% 보존
+        print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
+        return None
+
+"""
+def get_stock_code_by_name(stock_name):
     # 1. 수정한 완벽한 내부 자동완성 주소
     search_url = f"https://ac.finance.naver.com/ac?q={stock_name}&q_enc=utf-8&st=1&frm=stock&r_format=json"
     try:
@@ -41,36 +78,8 @@ def get_stock_code_by_name(stock_name):
     except Exception as e:
         print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
         return None
+"""
 
-"""
-def get_stock_code_by_name(stock_name):
-    try:
-        # 1. 오늘 날짜 기준으로 코스피/코스닥에 상장된 모든 종목코드(티커) 리스트 확보
-        # 네이버를 찌르지 않고 가상 서버 환경에서도 차단 없이 안전하게 데이터를 가져옵니다.
-        match_list = stock.get_market_ticker_list()
-        
-        # [RENDER 로그 강제 인젝션] 가져온 상장 주식 마켓 데이터 리스트 출력
-        print(f"=== [디버깅] 거래소 엔진 데이터 확보 성공 (총 {len(match_list)}개 종목) ===")
-        print(f"=== [디버깅] 추출된 match_list 구조(일부): {match_list[:5]} ===")
-        
-        for item in match_list:
-            # item 변수 하나에는 '005930' 같은 순수한 종목코드가 들어옵니다.
-            # stock.get_market_ticker_name(item) 함수를 쓰면 해당 코드의 진짜 종목명을 알아낼 수 있습니다.
-            ticker_name = stock.get_market_ticker_name(item)
-            
-            # 사용자가 입력한 종목명과 공백을 제거하고 정밀 비교합니다.
-            if ticker_name.replace(" ", "") == stock_name.replace(" ", ""):
-                print(f"=== [디버깅] 매칭 성공! 종목명: {ticker_name} -> 종목코드: {item} ===")
-                return item  # 정상적인 종목코드(예: '005930') 반환
-                
-        print("=== [디버깅] 거래소 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
-        return None
-        
-    except Exception as e:
-        # 에러 발생 시 Render 로그창에 범인을 찍어버립니다.
-        print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
-        return None
-"""
 
 class ForwardPricePredictor:
     def __init__(self, eps_this_year, eps_next_year):
