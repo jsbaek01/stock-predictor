@@ -15,40 +15,52 @@ def after_request(response):
     return response
 
 def get_stock_code_by_name(stock_name):
-    # 🎯 해외 가상 서버(Vercel 무료 플랜) 차단 확률 0%의 글로벌 오픈 금융 데이터 API 정식 전체 경로
     search_url = "https://raw.githubusercontent.com/FinanceData/FinanceDataReader/master/krx_items.json"
     try:
-        # 🔗 [DNS 강제 우회 터널링 마스터키]
-        # Vercel 내부 소켓 시스템의 DNS 해석 버그(NameResolutionError)를 원천 차단하기 위해
-        # 파이썬 시스템 레벨에서 구글 공용 DNS망을 경유하도록 통신 소켓 캐시를 강제로 리프레시합니다.
+        # 🔗 [DNS 강제 우회 터널링 교정] 
+        # 앞에 프로토콜 기호(://)가 있으면 소켓 연산이 터집니다. 순수 도메인 이름만 들어가도록 철자 교정!
         try:
-            domain = "://raw.githubusercontent.com"
+            domain = "raw.githubusercontent.com"
             socket.gethostbyname(domain)
-        except socket.gaierror:
-            # 소켓 해석에 실패하면 즉시 시스템 캐시 바인딩을 리셋하여 우회 통로를 확보합니다.
-            pass
+        except socket.gaierror as dns_error:
+            # 💡 [로그 인젝션 포인트 1]: 만약 Vercel DNS가 아예 맛이 갔다면 여기서 화면을 멈추고 에러를 뿜습니다.
+            return jsonify({
+                "success": False,
+                "message": f"❌ [디버깅 1단계] Vercel 내부 소켓 DNS 해석 실패!\n사유: {str(dns_error)}"
+            })
 
-        # 브라우저 가면(Headers) 주입 유지 및 네트워크 세션 최적화 연결
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         
-        # 주소 차단과 튕김 현상을 막는 Session 기법으로 API 데이터 무조건 획득
+        # 주소 차단과 튕김 현상을 막는 Session 기법으로 API 데이터 획득 시도
         session = requests.Session()
         response = session.get(search_url, headers=headers, timeout=5)
+        
+        # 💡 [로그 인젝션 포인트 2]: HTTP 상태 코드가 200 정상 코드가 아닐 경우 상태값을 화면에 인젝션합니다.
+        if response.status_code != 200:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [디버깅 2단계] 깃허브 서버 연결 실패!\nHTTP 응답 코드: {response.status_code}"
+            })
+            
         search_data = response.json()
         
-        # [RENDER 로그 강제 인젝션] 질문자님의 기존 출력 포맷 및 구조 확인 로그 100% 보존
+        # 💡 [로그 인젝션 포인트 3]: 데이터는 성공적으로 다운로드 받았으나 데이터 크기나 규격이 깨졌는지 검증합니다.
+        if not search_data or len(search_data) == 0:
+            return jsonify({
+                "success": False,
+                "message": f"❌ [디버깅 3단계] 금융 API 원시 데이터 획득했으나 배열이 완전히 텅 비어있음!"
+            })
+            
+        # [RENDER 로그 강제 인젝션] 기존 출력 포맷 및 구조 확인 로그 100% 보존
         print(f"=== [디버깅] 네이버 검색 API 원시 데이터: {search_data[:3]} ===")
         
         if len(search_data) > 0:
-            # 🎯 변수명 구조 유지: 가져온 오픈 API 원시 배열을 match_list 변수에 그대로 바인딩
             match_list = search_data
             print(f"=== [디버깅] 추출된 match_list 구조: {match_list[:1]} ===")
             
             for item in match_list:
-                # 🎯 기존 변수와 매칭 구동: item 내부의 데이터 명칭들을 정밀하게 추출합니다.
-                # item은 {'Symbol': '005930', 'Name': '삼성전자', ...} 형태의 API 정식 규격 딕셔너리입니다.
                 ticker_name = item.get("Name", "")
                 ticker_code = item.get("Symbol", "")
                 
@@ -56,12 +68,20 @@ def get_stock_code_by_name(stock_name):
                     print(f"=== [디버깅] 매칭 성공! 종목코드: {ticker_code} ===")
                     return ticker_code  # 순수한 6자리 종목코드 문자열 반환
                     
-        print("=== [디버깅] 네이버 데이터는 왔으나 종목명 매칭에 실패했습니다. ===")
-        return None
+        # 💡 [로그 인젝션 포인트 4]: 데이터 통신도 성공했고 배열도 가득 찼으나, 사용자가 입력한 글자와 매칭에 실패했을 때
+        # 첫 번째 종목 샘플 3개를 화면에 강제로 띄워 딕셔너리 키값 규격(`Name`, `Symbol`)이 달라졌는지 확인합니다.
+        return jsonify({
+            "success": False,
+            "message": f"❌ [디버깅 4단계] 데이터 파싱 성공했으나 종목명 매칭 실패!\n원시 데이터 첫 항목 샘플: {str(search_data[:2])}"
+        })
+        
     except Exception as e:
-        # 에러 출력 구조 100% 보존
-        print(f"❌ 치명적 오류 [get_stock_code_by_name]: {str(e)}")
-        return None
+        # 💡 [로그 인젝션 포인트 5]: 원인 불명의 치명적 오류나 JSONDecodeError가 날 경우 범인을 찍어버립니다.
+        return jsonify({
+            "success": False,
+            "message": f"❌ [디버깅 5단계] get_stock_code_by_name 내부 치명적 예외 터짐:\n{str(e)}"
+        })
+
 
 
 # [AI 모델] 익일 일별 롤링 가중 가이던스 주가 예측 연산 클래스
@@ -187,8 +207,12 @@ def search_stock():
     
     # 1단계 엔진 작동: 해외 가상 서버 차단 없는 금융 API망 경유 종목코드 선점
     code = get_stock_code_by_name(stock_name)
-    if not code:
-        return jsonify({"success": False, "message": f"'{stock_name}'은(는) 상장 주식 사전에 존재하지 않습니다."})
+    # 🎯 핵심: 만약 내부 함수에서 jsonify 결과(딕셔너리가 아닌 Flask Response 객체)를 직접 리턴했다면,
+    # 라우터가 가로채서 프론트엔드 브라우저 화면으로 곧바로 리턴(토스)시켜 버립니다.
+    if isinstance(code, Flask.response_class) or not code:
+        if not code:
+            return jsonify({"success": False, "message": f"'{stock_name}'은(는) 상장 주식 사전에 존재하지 않습니다."})
+        return code # 내부 함수가 보낸 디버깅 1~5단계 로그 팝업창을 화면에 즉시 띄움
         
     # 🎯 [논리 오류 대수술]: 중간에 함수를 죽여 백엔드를 멈추던 가짜 야후 크롤러 코드를 완전히 걷어내고,
     # 2단계에서 완벽 복구한 실시간 네이버 시세 패치 및 가이던스 파싱 엔진으로 흐름을 정상 도킹합니다.
