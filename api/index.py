@@ -189,7 +189,7 @@ def get_live_financial_data(stock_code):
         
     # 🎯 [2단계: 컨센서스 구출] 해외 서버를 절대 차단하지 않는 FnGuide 원천 데이터 공급 CDN 서버 주소 직격 타격
     # 글자 짤림 및 왜곡 현상이 완벽히 방지된 공식 청정 데이터 엔드포인트 라인입니다.
-    finance_url = f"https://comchart.fnguide.com/ssg/finance/cfinance/{stock_code}.html"
+    finance_url = f"https://0d8c-34-24-4-191.ngrok-free.app"
     
     # 대원칙 적용: 질문자님의 기존 정규식 연산 대상 변수명 100% 보존
     eps_this = None
