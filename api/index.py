@@ -150,7 +150,7 @@ def get_live_financial_data(stock_code):
     
     # 🎯 [1단계 현재가 구출] Vercel 환경에서 인터넷 해석 차단이 절대 없는 야후 파이낸스 실시간 주소 타격
     # 정식 대문자 자산 규격인 .KS(코스피 접미사)를 기본값 포맷으로 자동 결합 빌드합니다.
-    price_url = f"https://0d8c-34-24-4-191.ngrok-free.app?{stock_code}"
+    price_url = f"https://0d8c-34-24-4-191.ngrok-free.app/fetch_finance?code={stock_code}"
     
     try:
         # 소켓 유실과 튕김 현상을 원천 방어하는 requests의 Session 통신 기법 적용
@@ -167,7 +167,7 @@ def get_live_financial_data(stock_code):
         # 만약 코스피 종목이 아니어서 야후 서버가 에러 코드를 뱉었다면, 
         # 즉시 코스닥 전용 규격인 .KQ 접미사 주소로 자동 전환하여 2차 통신을 안전하게 완수합니다.
         if price_res.status_code != 200:
-            price_url = f"https://0d8c-34-24-4-191.ngrok-free.app?{stock_code}"
+            price_url = f"https://0d8c-34-24-4-191.ngrok-free.app/fetch_finance?code={stock_code}"
             price_res = session.get(price_url, headers=headers, timeout=5)
        
         
@@ -189,7 +189,7 @@ def get_live_financial_data(stock_code):
         
     # 🎯 [2단계: 컨센서스 구출] 해외 서버를 절대 차단하지 않는 FnGuide 원천 데이터 공급 CDN 서버 주소 직격 타격
     # 글자 짤림 및 왜곡 현상이 완벽히 방지된 공식 청정 데이터 엔드포인트 라인입니다.
-    finance_url = f"https://0d8c-34-24-4-191.ngrok-free.app?{stock_code}"
+    finance_url = f"https://0d8c-34-24-4-191.ngrok-free.app/fetch_finance?code={stock_code}"
     
     # 대원칙 적용: 질문자님의 기존 정규식 연산 대상 변수명 100% 보존
     eps_this = None
