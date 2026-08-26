@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOSPI200 AI 주가 예측 시스템</title>
+    
+    <!-- 🎨 외부 디자인 에셋 주입 (Tailwind CSS 및 구글 폰트) -->
+    <script src="https://jsdelivr.net"></script>
+    <link rel="preconnect" href="https://googleapis.com">
+    <link rel="preconnect" href="https://gstatic.com" crossorigin>
+    <link href="https://googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
+    <!-- 패브릭 UI 및 퀀트 느낌을 위한 아이콘 팩 수입 -->
+    <link rel="stylesheet" href="https://cloudflare.com">
+
+    <style>
+        /* 폰트를 대한민국 표준 Pretendard로 통일하여 고급스러운 느낌 극대화 */
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #0b0f19; /* 깊고 묵직한 금융 다크 모드 배경색 */
+            overflow-x: hidden;
+        }
+        /* 미래지향적인 네온 그라데이션 빛무리 효과 배경 */
+        .neon-glow {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(0,0,0,0) 70%);
+            top: -100px;
+            right: -100px;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .neon-glow-left {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, rgba(0,0,0,0) 70%);
+            bottom: -150px;
+            left: -150px;
+            z-index: 0;
+            pointer-events: none;
+        }
+        /* 글래스모피즘: 유리알처럼 투명하게 뒤가 비치는 고급 카드 스타일 */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+    </style>
+</head>
+<body class="text-gray-100 min-h-screen relative flex flex-col justify-between">
+    
+    <!-- 배경 은은한 빛 효과 레이어 -->
+    <div class="neon-glow"></div>
+    <div class="neon-glow-left"></div>
+
+    <!-- 🌌 메인 컨테이너 영역 -->
+    <main class="container mx-auto max-w-4xl px-4 py-8 relative z-10 flex-grow">
+        
+        <!-- 🔔 1. 상단 대시보드 헤더 영역 -->
+        <header class="text-center mb-10 mt-4 animate-fade-in">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold mb-3">
+                <i class="fa-solid var(--fa-beat) fa-microchip"></i> Microsoft Developer Spec AI Engine
+            </div>
+            <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-400 bg-clip-text text-transparent">
+                KOSPI 200 내일의 주가 예측
+            </h1>
+            <p class="text-slate-400 text-sm mt-2 max-w-md mx-auto">
+                매일 오전 6시 미장 동향 및 개별 뉴스를 시총 가중치로 결합한 실시간 LLM 퀀트 애널리스트 시스템
+            </p>
+        </header>
+
+        <!-- (여기에 2/3 단계인 '오전 6시 전광판 및 종목 검색 섹션'이 이어서 붙게 됩니다) -->
+
+
+
+              <!-- 📊 2. 오전 6시 기준 코스피 200 예측 현황판 (종합 지수 전광판) -->
+        <section class="glass-panel rounded-2xl p-6 mb-8 relative overflow-hidden">
+            <!-- 배경에 묻어나는 은은한 격자 무늬 -->
+            <div class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+            
+            <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h2 class="text-sm font-semibold text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-clock text-indigo-400"></i> 오전 06:00 지수 예측 베이스라인
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1" id="morning-time-txt">최근 업데이트: 데이터 수집 대기 중...</p>
+                </div>
+                
+                <!-- 지수 점수판: 데이터에 따라 빨간색(+) 또는 파란색(-) 네온 효과가 실시간으로 걸립니다 -->
+                <div class="text-center md:text-right">
+                    <span class="text-xs font-bold text-slate-400 block mb-1">코스피 200 예상 변동률</span>
+                    <div class="text-4xl font-extrabold tracking-tight transition-all duration-300" id="kospi-index-badge">
+                        -- %
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 🔍 3. 주식 종목 검색 및 입력 섹션 -->
+        <section class="mb-8">
+            <form id="search-form" onsubmit="handleStockSearch(event)" class="relative group">
+                <!-- 마이크로소프트 서피스 느낌의 네온 테두리 그라데이션 효과 -->
+                <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-300"></div>
+                
+                <div class="relative flex items-center bg-[#111723] rounded-xl overflow-hidden border border-slate-700/50">
+                    <div class="pl-5 text-slate-400">
+                        <i class="fa-solid fa-magnifying-glass text-lg"></i>
+                    </div>
+                    <!-- 입력 칸: 좆같이 입력해도 서버가 다 정정해주니 힌트로 안심시켜줍니다 -->
+                    <input type="text" id="search-input" 
+                           placeholder="종목명 또는 약어를 입력하세요 (예: 삼전, 하닉, 땅콩, 불닭)..." 
+                           class="w-full bg-transparent py-4.5 px-4 text-white text-base focus:outline-none placeholder-slate-500"
+                           autocomplete="off">
+                    <button type="submit" 
+                            class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-7 py-4.5 transition duration-200 flex items-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/20">
+                        AI 분석 <i class="fa-solid fa-arrow-right text-sm"></i>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+
+        <!-- ⏳ 4. AI 실시간 시황 결합 로딩바 (평소엔 숨김 상태) -->
+        <section id="loading-section" class="hidden glass-panel rounded-2xl p-8 text-center border-indigo-500/20 animate-pulse">
+            <div class="flex flex-col items-center justify-center gap-4">
+                <!-- 뱅글뱅글 도는 미래형 스피너 -->
+                <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-400 rounded-full animate-spin"></div>
+                <div>
+                    <h3 class="text-lg font-bold text-indigo-300">제미나이가 실시간 뉴스 탐색 중...</h3>
+                    <p class="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
+                        오전 6시 베이스라인 데이터에 장중 실시간 구글 시황 속보를 결합하여 최종 리포트를 산출하는 중입니다. 잠시만 기다려주세요.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- (여기에 3/3 단계인 '최종 결과 리포트 출력 창 및 자바스크립트 통신 엔진'이 이어서 결합됩니다) -->
+
+        <!-- 📝 5. 제미나이 최종 AI 주가 예측 리포트 출력 창 (평소엔 숨김 상태) -->
+        <section id="result-section" class="hidden glass-panel rounded-2xl p-6 md:p-8 border-emerald-500/20 shadow-emerald-950/10">
+            <!-- 종목 헤더 정보 -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700/50 pb-6 mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20 text-xl font-bold">
+                        AI
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-extrabold text-white" id="res-stock-name">삼성전자</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">KOSPI 200 시황 결합형 예측 리포트</p>
+                    </div>
+                </div>
+                <!-- 아침 6시 베이스라인 스코어 간이 정보판 -->
+                <div class="flex gap-3 text-xs bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
+                    <div><span class="text-slate-500">미장 영향:</span> <span id="res-us-score" class="font-bold">--</span></div>
+                    <div class="text-slate-700">|</div>
+                    <div><span class="text-slate-500">아침 뉴스:</span> <span id="res-news-score" class="font-bold">--</span></div>
+                </div>
+            </div>
+
+            <!-- 마크다운 형태의 제미나이 리포트가 이쁘게 들어갈 마법의 공간 -->
+            <div id="report-content" class="prose prose-invert max-w-none text-slate-300 leading-relaxed space-y-6">
+                <!-- 자바스크립트가 구조를 파싱해서 동적으로 꽂아 넣습니다 -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 🏢 하단 푸터 (마이크로소프트 개발자 스펙 명시) -->
+    <footer class="w-full text-center py-6 text-xs text-slate-600 border-t border-slate-900 relative z-10 bg-[#0b0f19]">
+        <p>© 2026 KOSPI200 AI Quant Predictor. Powered by Google Gemini API & FastAPI.</p>
+        <p class="text-slate-700 mt-1">본 데이터는 AI 시황 분석 결과이며 투자 결과에 대한 법적 책임을 지지 않습니다.</p>
+    </footer>
+
+    <!-- =====================================================================
+         [프론트엔드 심장부] 자바스크립트 백엔드 통신 및 UI 제어 스크립트
+         ===================================================================== -->
+    <script>
+        // 백엔드 FastAPI 서버 기본 주소 세팅 (로컬 테스트 기준 8000포트)
+        const BACKEND_URL = "http://localhost:8000";
+
+        // 페이지가 열리자마자 오전 6시 종합 코스피 200 지수 전광판 데이터를 가져옵니다.
+        window.addEventListener("DOMContentLoaded", async () => {
+            try {
+                // 백엔드 서버의 상태를 체크하거나 임의로 최초 전광판 데이터를 세팅하는 로직
+                // (실제 서버 가동 시 morning_data 구조에 맞춰 연동)
+                updateMorningDashboard();
+            } catch (err) {
+                console.error("대시보드 동기화 실패:", err);
+            }
+        });
+
+        // 1. 오전 6시 대시보드 전광판 UI 업데이트 함수
+        function updateMorningDashboard() {
+            const indexBadge = document.getElementById("kospi-index-badge");
+            const timeTxt = document.getElementById("morning-time-txt");
+
+            // 임시로 백엔드에서 받아왔다고 가정하는 코스피200 종합 예측치 세팅 로직
+            // 실제 구현 시 백엔드 엔드포인트를 하나 파서 동적으로 채우셔도 좋습니다.
+            const dummyKospiExpected = 3.25; // 예시: +3.25%
+            const nowStr = new Date().toLocaleDateString() + " 06:00:00";
+
+            timeTxt.innerText = `최근 업데이트: ${nowStr} 정각 완료`;
+            
+            if (dummyKospiExpected >= 0) {
+                indexBadge.innerText = `+${dummyKospiExpected}%`;
+                indexBadge.className = "text-4xl font-extrabold tracking-tight text-red-500 drop-shadow-[0_0_12px_rgba(239,68,68,0.3)]";
+            } else {
+                indexBadge.innerText = `${dummyKospiExpected}%`;
+                indexBadge.className = "text-4xl font-extrabold tracking-tight text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.3)]";
+            }
+        }
+
+        // 2. 고객 종목 검색 메인 컨트롤러 함수
+        async function handleStockSearch(event) {
+            event.preventDefault();
+            
+            const keyword = document.getElementById("search-input").value.trim();
+            const loadingSec = document.getElementById("loading-section");
+            const resultSec = document.getElementById("result-section");
+
+            if (!keyword) return;
+
+            // UI 상태 초기화 (검색 시작 시 로딩 바 켜고 이전 결과 숨김)
+            loadingSec.classList.remove("hidden");
+            resultSec.classList.add("hidden");
+
+            try {
+                // 📡 백엔드 FastAPI 서버로 사용자가 입력한 검색어 전송 (CORS 완전 방어됨)
+                const response = await fetch(`${BACKEND_URL}/api/predict?keyword=${encodeURIComponent(keyword)}`);
+                
+                if (!response.ok) {
+                    throw new Error("서버 분석 도중 에러가 발생했습니다.");
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 데이터 바인딩 시작
+                    document.getElementById("res-stock-name").innerText = data.stock_name;
+                    
+                    const mInfo = data.morning_baseline;
+                    document.getElementById("res-us-score").innerText = mInfo.us_market_score >= 0 ? `+${mInfo.us_market_score}` : mInfo.us_market_score;
+                    document.getElementById("res-news-score").innerText = mInfo.news_score >= 0 ? `+${mInfo.news_score}` : mInfo.news_score;
+
+                    // 제미나이가 뱉은 텍스트 줄바꿈 및 스타일 깔끔하게 가공하여 출력
+                    renderFormattedReport(data.prediction);
+
+                    // 로딩 숨기고 결과 창 우아하게 노출
+                    resultSec.classList.remove("hidden");
+                }
+            } catch (error) {
+                alert(`⚠️ 오류 발생: ${error.message}\n백엔드 서버(app.py)가 정상적으로 켜져 있는지 확인해주세요!`);
+            } finally {
+                // 에러가 나든 성공하든 로딩바는 종료
+                loadingSec.classList.add("hidden");
+            }
+        }
+
+        // 3. 제미나이 리포트 텍스트를 네온 카드 디자인으로 변환해 주는 포맷터
+        function renderFormattedReport(rawText) {
+            const container = document.getElementById("report-content");
+            container.innerHTML = ""; // 기존 데이터 청소
+
+            // 제미나이가 준 양식 필수 항목별로 문단을 쪼갭니다.
+            const sections = rawText.split("\n\n");
+
+            sections.forEach(section => {
+                if (!section.trim()) return;
+
+                const div = document.createElement("div");
+                
+                // 각 항목의 헤더 색상을 퀀트 스타일에 맞게 강조 처리
+                if (section.startsWith("📌") || section.startsWith("📈") || section.startsWith("💡") || section.startsWith("🛠️")) {
+                    div.className = "bg-slate-900/40 p-5 rounded-xl border border-slate-800/80 leading-relaxed shadow-sm";
+                    
+                    // 첫 번째 줄(타이틀)과 나머지 본문 분리
+                    const lines = section.split("\n");
+                    const title = lines[0];
+                    const body = lines.slice(1).join("<br>");
+
+                    div.innerHTML = `<h4 class="text-indigo-400 font-bold text-base mb-2 flex items-center gap-2">${title}</h4>
+                                     <p class="text-slate-300 text-sm leading-relaxed">${body}</p>`;
+                } else {
+                    div.className = "text-slate-300 text-sm pl-2 leading-relaxed";
+                    div.innerHTML = section.replace(/\n/g, "<br>");
+                }
+                
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>
+
+      
